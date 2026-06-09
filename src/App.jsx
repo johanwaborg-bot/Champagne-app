@@ -550,7 +550,7 @@ Rules:
         <label style={{ ...label, marginBottom: 0 }}>Tasting Note · WSET L4</label>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontFamily: serif, fontSize: 12, color: filled === 4 ? GOLD : INK_SOFT }}>{filled}/4</span>
-          <button onClick={() => fileRef.current.click()} style={{ background: "transparent", border: `1px solid ${LINE}`, borderRadius: 2, color: GOLD_DEEP, padding: "5px 11px", cursor: "pointer", fontFamily: serif, fontSize: 12, letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 5 }}>📷 SCAN</button>
+          <button onClick={() => fileRef.current && fileRef.current.click()} style={{ background: "transparent", border: `1px solid ${LINE}`, borderRadius: 2, color: GOLD_DEEP, padding: "5px 11px", cursor: "pointer", fontFamily: serif, fontSize: 12, letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 5 }}>📷 SCAN</button>
         </div>
       </div>
 
@@ -574,6 +574,8 @@ Rules:
         <textarea value={notes[active] || ""} onChange={e => onChange({ ...notes, [active]: e.target.value })} placeholder={sec.placeholder} rows={sec.rows}
           style={{ width: "100%", background: "transparent", border: "none", borderTop: `1px solid ${LINE_SOFT}`, color: INK, fontFamily: serif, fontSize: 15, padding: "10px 0 0", outline: "none", resize: "none", boxSizing: "border-box", lineHeight: 1.8 }} />
       </div>
+
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={e => pick(e.target.files[0])} style={{ display: "none" }} />
     </div>
   );
 }
@@ -743,6 +745,293 @@ function TastingCard({ wine, n, total, blind, onUpdate, onNext, onPrev, onReveal
         system: `You are a Champagne expert. Given a house/producer name respond ONLY with JSON (no markdown): {"fullName":"...","founded":"year","village":"village, region","style":"short style descriptor","grapes":"typical grape focus","production":"grower/négociant/co-op + rough size","bio":"2-3 sentence connoisseur summary","tags":["3-4 descriptor tags"]}. If unknown: {"error":"Unknown"}.`,
         messages: [{ role: "user", content: wine.producer }],
       });
+      const info = parseJSON(text);
+      up({ producerInfo: info.error ? { bio: "No information found.", fullName: wine.producer } : info });
+    } catch (e) { up({ producerInfo: { bio: "Could not load: " + e.message, fullName: wine.producer } }); }
+    setLoadingInfo(false);
+  };
+
+  const showIdentity = !blind || wine.revealed;
+
+  return (
+    <div style={{ maxWidth: 620, margin: "0 auto", padding: "24px 20px" }}>
+      {/* Nav */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
+        <button onClick={onPrev} disabled={n === 1} style={{ background: "none", border: "none", color: n === 1 ? LINE : GOLD_DEEP, cursor: n === 1 ? "default" : "pointer", fontSize: 22, padding: "4px 8px" }}>←</button>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontFamily: serif, fontSize: 10, letterSpacing: 5, color: INK_SOFT }}>WINE</div>
+          <div style={{ fontFamily: serif, fontSize: 34, color: GOLD_DEEP, lineHeight: 1, fontWeight: 600 }}>{n}<span style={{ fontSize: 16, color: LINE }}> / {total}</span></div>
+        </div>
+        <button onClick={onNext} style={{ background: "none", border: "none", color: GOLD_DEEP, cursor: "pointer", fontSize: 22, padding: "4px 8px" }}>→</button>
+      </div>
+
+      {/* Identity */}
+      <div style={{ border: `1px solid ${LINE}`, borderRadius: 3, padding: "16px", marginBottom: 18, background: PAPER, boxShadow: `0 2px 8px ${SHADOW}` }}>
+        {showIdentity ? (
+          <>
+            {showIdentity && <BottlePhoto photo={wine.bottlePhoto} onChange={p => up({ bottlePhoto: p })} />}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 14px" }}>
+              <div style={{ gridColumn: "span 2" }}><label style={label}>Producer / House</label><input value={wine.producer} onChange={e => up({ producer: e.target.value, producerInfo: null })} placeholder="e.g. Pierre Péters" style={inputBase} /></div>
+              <div style={{ gridColumn: "span 2" }}><label style={label}>Cuvée</label><input value={wine.cuvee} onChange={e => up({ cuvee: e.target.value })} placeholder="e.g. Les Chétillons" style={inputBase} /></div>
+              <div><label style={label}>Vintage</label><input value={wine.vintage} onChange={e => up({ vintage: e.target.value })} placeholder="NV / 2013" style={inputBase} /></div>
+              <div><label style={label}>Type</label>
+                <select value={wine.type} onChange={e => up({ type: e.target.value })} style={{ ...inputBase, fontSize: 14 }}>{WINE_TYPES.map(t => <option key={t}>{t}</option>)}</select>
+              </div>
+              <div><label style={label}>Village / Cru</label><input value={wine.village} onChange={e => up({ village: e.target.value })} placeholder="e.g. Le Mesnil GC" style={inputBase} /></div>
+              <div><label style={label}>Grape Blend</label><input value={wine.blend} onChange={e => up({ blend: e.target.value })} placeholder="e.g. 100% Chardonnay" style={inputBase} /></div>
+            </div>
+
+            <Divider m="16px 0" />
+            <div style={{ fontFamily: serif, fontSize: 11, letterSpacing: 2, color: GOLD_DEEP, textTransform: "uppercase", marginBottom: 10 }}>Technical Detail</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 14px" }}>
+              <div><label style={label}>Disgorgement</label><input value={wine.disgorgement} onChange={e => up({ disgorgement: e.target.value })} placeholder="e.g. 03/2022" style={inputBase} /></div>
+              <div><label style={label}>Dosage (g/L)</label><input value={wine.dosage} onChange={e => up({ dosage: e.target.value })} placeholder="e.g. 4" style={inputBase} /></div>
+              <div><label style={label}>Oak</label><select value={wine.oak} onChange={e => up({ oak: e.target.value })} style={{ ...inputBase, fontSize: 14 }}>{OAK_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></div>
+              <div><label style={label}>Malolactic</label><select value={wine.malo} onChange={e => up({ malo: e.target.value })} style={{ ...inputBase, fontSize: 14 }}>{MALO_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></div>
+            </div>
+          </>
+        ) : (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ fontFamily: serif, fontSize: 13, letterSpacing: 5, color: INK_SOFT, marginBottom: 6 }}>BLIND TASTING</div>
+            <div style={{ fontFamily: serif, fontSize: 15, color: INK_SOFT, fontStyle: "italic", marginBottom: 16 }}>Assess the wine before revealing its identity.</div>
+            <Btn onClick={onReveal}>Reveal Identity</Btn>
+          </div>
+        )}
+      </div>
+
+      {/* Producer card */}
+      {showIdentity && wine.producer && <ProducerCard producer={wine.producer} info={wine.producerInfo} onFetch={fetchInfo} loading={loadingInfo} />}
+
+      {/* Score */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <label style={{ ...label, marginBottom: 0 }}>Score</label>
+        <div style={{ fontFamily: serif, fontSize: 30, color: GOLD_DEEP, fontWeight: 600 }}>{tot}<span style={{ fontSize: 14, color: INK_SOFT }}>/100</span></div>
+      </div>
+      <div style={{ marginBottom: 22 }}>{CRITERIA.map(c => <ScoreSlider key={c.id} criterion={c} value={wine.scores[c.id]} onChange={v => up({ scores: { ...wine.scores, [c.id]: v } })} />)}</div>
+
+      <Divider />
+
+      {/* Aroma */}
+      <div style={{ marginBottom: 22 }}>
+        <label style={label}>Aromatic Profile</label>
+        <AromaWheel selected={wine.aromas} onToggle={t => up({ aromas: wine.aromas.includes(t) ? wine.aromas.filter(x => x !== t) : [...wine.aromas, t] })} />
+      </div>
+
+      {/* WSET notes */}
+      <WsetNotes notes={wine.wsetNotes} onChange={wsetNotes => up({ wsetNotes })} onScan={applyScan} />
+
+      <Btn primary={isLast} onClick={onNext} style={{ width: "100%" }}>{isLast ? "Complete Flight →" : "Next Wine →"}</Btn>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  FLIGHT SUMMARY (RESULTS)
+// ════════════════════════════════════════════════════════════════════════
+
+function SummaryScreen({ session, wines, onBack, onRestart }) {
+  const sorted = [...wines].map((w, i) => ({ ...w, originalIndex: i })).sort((a, b) => scoreTotal(b) - scoreTotal(a));
+  const [aiSummary, setAiSummary] = useState(null); // { flight, wines: {id: text} }
+  const [loading, setLoading] = useState(false);
+
+  const medal = i => ["🥇", "🥈", "🥉"][i] || `${i + 1}`;
+  const medalColor = i => [GOLD, "#9a9a8a", "#b08a5a"][i] || LINE;
+
+  const generateSummary = async () => {
+    setLoading(true);
+    const wineData = wines.map((w, i) => ({
+      n: i + 1,
+      producer: w.producer || "Unknown",
+      cuvee: w.cuvee, vintage: w.vintage, type: w.type, village: w.village,
+      blend: w.blend, dosage: w.dosage, disgorgement: w.disgorgement, oak: w.oak, malo: w.malo,
+      score: scoreTotal(w),
+      aromas: w.aromas,
+      notes: w.wsetNotes,
+    }));
+    try {
+      const text = await callClaude({
+        max_tokens: 2500,
+        system: `You are a Master Sommelier writing an elegant post-tasting summary for a connoisseur's flight of Champagnes. Respond ONLY with JSON (no markdown): {"flight":"2-3 sentence overview of the flight as a whole — themes, standouts, contrasts","wines":[{"n":1,"impression":"2-3 sentence refined summary of this wine's character and showing","highlight":"one short phrase capturing its signature moment or defining trait"}]}. Base everything on the provided data and notes. Be specific and evocative but grounded.`,
+        messages: [{ role: "user", content: JSON.stringify({ session: session.name, wines: wineData }) }],
+      });
+      setAiSummary(parseJSON(text));
+    } catch (e) {
+      setAiSummary({ flight: "Could not generate summary: " + e.message, wines: [] });
+    }
+    setLoading(false);
+  };
+
+  const wineImpression = (w) => aiSummary?.wines?.find(x => x.n === w.originalIndex + 1);
+
+  return (
+    <div style={{ maxWidth: 640, margin: "0 auto", padding: "32px 20px 60px" }}>
+      <div style={{ textAlign: "center", marginBottom: 6 }}>
+        <div style={{ fontFamily: serif, fontSize: 11, letterSpacing: 6, color: GOLD_DEEP }}>THE FLIGHT</div>
+        <h2 style={{ fontFamily: serif, fontSize: 36, fontWeight: 600, color: INK, margin: "6px 0 4px" }}>{session.name || "Tasting Summary"}</h2>
+        <div style={{ fontFamily: serif, fontSize: 13, color: INK_SOFT }}>{session.location && `${session.location} · `}{session.date} · {wines.length} wines · {session.blind ? "Blind" : "Open"}</div>
+      </div>
+      <Divider />
+
+      {/* AI flight overview */}
+      {!aiSummary && !loading && (
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <Btn primary onClick={generateSummary} style={{ width: "100%" }}>✦ Generate Flight Summary</Btn>
+          <div style={{ fontFamily: serif, fontSize: 13, color: INK_SOFT, marginTop: 8, fontStyle: "italic" }}>A sommelier's overview and per-wine impressions</div>
+        </div>
+      )}
+      {loading && <div style={{ textAlign: "center", padding: "24px 0", marginBottom: 16 }}><div style={{ display: "inline-flex" }}><Dots /></div><div style={{ fontFamily: serif, fontSize: 14, color: INK_SOFT, letterSpacing: 2, marginTop: 10 }}>Composing the summary…</div></div>}
+      {aiSummary?.flight && (
+        <div style={{ background: PAPER, border: `1px solid ${LINE}`, borderLeft: `3px solid ${GOLD}`, borderRadius: 3, padding: "16px 18px", marginBottom: 26, boxShadow: `0 2px 8px ${SHADOW}` }}>
+          <div style={{ fontFamily: serif, fontSize: 11, letterSpacing: 2, color: GOLD_DEEP, textTransform: "uppercase", marginBottom: 6 }}>The Flight in Summary</div>
+          <p style={{ fontFamily: serif, fontSize: 16, color: INK, lineHeight: 1.8, margin: 0, fontStyle: "italic" }}>{aiSummary.flight}</p>
+        </div>
+      )}
+
+      {/* Ranked wines with full detail */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {sorted.map((w, i) => {
+          const imp = wineImpression(w);
+          const filled = WSET.filter(s => w.wsetNotes[s.id]?.trim());
+          return (
+            <div key={w.id} style={{ background: PAPER, border: `1px solid ${i === 0 ? GOLD : LINE}`, borderRadius: 4, overflow: "hidden", boxShadow: `0 3px 12px ${SHADOW}` }}>
+              {/* Header band */}
+              <div style={{ display: "flex", gap: 14, padding: "14px 16px", background: i === 0 ? "rgba(168,132,44,0.07)" : "transparent", borderBottom: `1px solid ${LINE_SOFT}` }}>
+                {w.bottlePhoto && <img src={w.bottlePhoto} alt="" style={{ width: 44, height: 60, objectFit: "cover", borderRadius: 2, border: `1px solid ${LINE}` }} />}
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <span style={{ fontSize: 17, color: medalColor(i) }}>{medal(i)}</span>
+                    <span style={{ fontFamily: serif, fontSize: 18, color: INK, fontWeight: 600 }}>{w.producer || "Unknown"}{w.cuvee ? ` · ${w.cuvee}` : ""}</span>
+                  </div>
+                  <div style={{ fontFamily: serif, fontSize: 13, color: INK_SOFT, marginTop: 2 }}>
+                    {[w.type, w.vintage, w.village].filter(Boolean).join(" · ")}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontFamily: serif, fontSize: 26, color: medalColor(i), fontWeight: 600 }}>{scoreTotal(w)}</div>
+                  <div style={{ fontFamily: serif, fontSize: 11, color: INK_SOFT }}>/ 100</div>
+                </div>
+              </div>
+
+              <div style={{ padding: "14px 16px" }}>
+                {/* AI impression */}
+                {imp && (
+                  <div style={{ marginBottom: 12 }}>
+                    {imp.highlight && <div style={{ fontFamily: serif, fontSize: 13, color: GOLD_DEEP, fontStyle: "italic", marginBottom: 5 }}>“{imp.highlight}”</div>}
+                    <p style={{ fontFamily: serif, fontSize: 14.5, color: INK, lineHeight: 1.7, margin: 0 }}>{imp.impression}</p>
+                  </div>
+                )}
+
+                {/* Technical line */}
+                {(w.blend || w.dosage || w.disgorgement || w.oak !== "Unknown" || w.malo !== "Unknown") && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", marginBottom: 10, padding: "8px 0", borderTop: `1px solid ${LINE_SOFT}`, borderBottom: `1px solid ${LINE_SOFT}` }}>
+                    {[["Blend", w.blend], ["Dosage", w.dosage && `${w.dosage} g/L`], ["Disg.", w.disgorgement], ["Oak", w.oak !== "Unknown" && w.oak], ["Malo", w.malo !== "Unknown" && w.malo]].filter(r => r[1]).map(([k, v]) => (
+                      <span key={k} style={{ fontFamily: serif, fontSize: 12.5, color: INK_SOFT }}><span style={{ color: GOLD_DEEP }}>{k}:</span> {v}</span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Aromas */}
+                {w.aromas.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: filled.length ? 10 : 0 }}>
+                    {w.aromas.map(a => <span key={a} style={{ fontFamily: serif, fontSize: 12, color: INK_SOFT, padding: "1px 8px", border: `1px solid ${LINE_SOFT}`, borderRadius: 2 }}>{a}</span>)}
+                  </div>
+                )}
+
+                {/* WSET notes */}
+                {filled.length > 0 && (
+                  <details style={{ marginTop: 4 }}>
+                    <summary style={{ fontFamily: serif, fontSize: 12, letterSpacing: 1.5, color: GOLD_DEEP, textTransform: "uppercase", cursor: "pointer" }}>Full Tasting Note</summary>
+                    <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                      {filled.map(s => (
+                        <div key={s.id}>
+                          <div style={{ fontFamily: serif, fontSize: 10, letterSpacing: 2, color: GOLD_DEEP, textTransform: "uppercase", marginBottom: 2 }}>{s.roman} · {s.label}</div>
+                          <p style={{ fontFamily: serif, fontSize: 14, color: INK, lineHeight: 1.65, margin: 0 }}>{w.wsetNotes[s.id]}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <Divider />
+      <div style={{ display: "flex", gap: 12 }}>
+        <Btn onClick={onBack} style={{ flex: 1 }}>← Back to Tasting</Btn>
+        <Btn onClick={onRestart} style={{ flex: 1 }}>New Flight</Btn>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  ROOT
+// ════════════════════════════════════════════════════════════════════════
+
+export default function App() {
+  const [screen, setScreen] = useState("setup");
+  const [library, setLibrary] = useState(false);
+  const [session, setSession] = useState(null);
+  const [wines, setWines] = useState([]);
+  const [current, setCurrent] = useState(0);
+
+  const start = (s) => {
+    setSession(s);
+    setWines(Array.from({ length: s.count }, (_, i) => createWine(i)));
+    setCurrent(0);
+    setScreen("tasting");
+  };
+  const updateWine = (w) => setWines(prev => prev.map(x => x.id === w.id ? w : x));
+
+  return (
+    <div style={{ minHeight: "100vh", background: BG, backgroundImage: "radial-gradient(circle at 20% 10%, rgba(255,250,235,0.6), transparent 40%), radial-gradient(circle at 85% 90%, rgba(220,201,160,0.25), transparent 45%)" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap');
+        * { box-sizing: border-box; }
+        body { margin: 0; }
+        input[type=range] { -webkit-appearance: none; appearance: none; background: transparent; }
+        input[type=date]::-webkit-calendar-picker-indicator { filter: sepia(1) saturate(2) hue-rotate(5deg); opacity: 0.55; cursor: pointer; }
+        textarea::placeholder, input::placeholder { color: #b8a87a; }
+        select { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23a8842c'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 26px !important; }
+        ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-track { background: #efe4c8; } ::-webkit-scrollbar-thumb { background: #d8c9a0; border-radius: 4px; }
+        @keyframes pulse { 0%,100% { opacity: 0.25; transform: scale(0.8);} 50% { opacity: 1; transform: scale(1);} }
+        details summary::-webkit-details-marker { display: none; }
+        details summary { list-style: none; }
+      `}</style>
+
+      <div style={{ height: 3, background: `linear-gradient(90deg, transparent, ${GOLD}, transparent)` }} />
+
+      {library && <Library onClose={() => setLibrary(false)} />}
+
+      {/* Persistent library button on tasting/summary */}
+      {(screen === "tasting" || screen === "summary") && !library && (
+        <button onClick={() => setLibrary(true)} style={{ position: "fixed", bottom: 20, right: 20, zIndex: 50, width: 52, height: 52, borderRadius: "50%", background: `linear-gradient(135deg, ${GOLD_DEEP}, ${GOLD})`, border: "none", color: PAPER, fontSize: 22, cursor: "pointer", boxShadow: "0 4px 16px rgba(120,95,40,0.4)" }} title="Champagne Library">📖</button>
+      )}
+
+      {screen === "setup" && <SetupScreen onStart={start} onLibrary={() => setLibrary(true)} />}
+
+      {screen === "tasting" && wines.length > 0 && (
+        <TastingCard
+          wine={wines[current]} n={current + 1} total={wines.length} blind={session.blind}
+          onUpdate={updateWine}
+          onReveal={() => updateWine({ ...wines[current], revealed: true })}
+          onNext={() => { if (current < wines.length - 1) setCurrent(c => c + 1); else setScreen("summary"); }}
+          onPrev={() => setCurrent(c => Math.max(0, c - 1))}
+          isLast={current === wines.length - 1}
+        />
+      )}
+
+      {screen === "summary" && (
+        <SummaryScreen session={session} wines={wines} onBack={() => setScreen("tasting")} onRestart={() => { setScreen("setup"); setWines([]); setSession(null); }} />
+      )}
+
+      <div style={{ height: 3, background: `linear-gradient(90deg, transparent, ${LINE}, transparent)` }} />
+    </div>
+  );
+}
+
       const info = parseJSON(text);
       up({ producerInfo: info.error ? { bio: "No information found.", fullName: wine.producer } : info });
     } catch (e) { up({ producerInfo: { bio: "Could not load: " + e.message, fullName: wine.producer } }); }

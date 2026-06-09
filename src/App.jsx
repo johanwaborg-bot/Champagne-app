@@ -147,7 +147,7 @@ async function callClaude({ system, messages, max_tokens = 1500 }) {
   const res = await fetch("/api/claude", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens, system, messages }),
+    body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens, system, messages }),
   });
   if (!res.ok) throw new Error(`${res.status}: ${(await res.text()).slice(0, 160)}`);
   const data = await res.json();
